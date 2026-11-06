@@ -453,7 +453,9 @@ export function processWheel(
     // Mặt ngoài phải là trụ thẳng đúng đường kính từ đầu tới cuối, để in ra không gồ ghề; mâm đã thẳng thì không đổi.
     const fill = fillOuter(wasm, slices, R, W, seg);
     if (fill) {
+      const rim = topRim(wasm, slices, R, W, spec.wall, seg);
       m = keep(m.add(keep(keep(fill).asOriginal())));
+      m = keep(m.add(keep(keep(rim.ring).asOriginal())));
       // Đắp ngoài có thể bịt rãnh cuốn ở mép vành thành khoang kín bên trong (mảnh thể tích âm): lấp luôn.
       const shells = m.decompose();
       const solid = shells.filter((p) => p.volume() > 0);
@@ -461,6 +463,7 @@ export function processWheel(
       for (const p of shells) p.delete();
       slices = new Slices(m, W);
       steps.push(`Đắp đầy mặt ngoài thành trụ thẳng Ø${fmt(spec.diameter)} mm`);
+      steps.push(`Làm vành phẳng đều ở mặt ngoài, rộng ${fmt(R - rim.inner)} mm, phủ kín mép gốc`);
     }
     steps.push(
       `Đổi kích thước: Ø${fmt(sourceDiameter)} → Ø${fmt(spec.diameter)} mm (×${fmt(sr, 3)}), ` +
@@ -696,6 +699,41 @@ function roundBarrel(wasm: ManifoldToplevel, m: Manifold, R: number, W: number, 
   const out = new wasm.Mesh({ numProp, vertProperties: vert, triVerts });
   const rounded = wasm.Manifold.ofMesh(out);
   return rounded.asOriginal();
+}
+
+/**
+ * Vành phẳng ở mặt ngoài mâm: mép gốc rộng hẹp và cao thấp không đều, nên phủ một vòng tròn đều lên trên, mặt trên phẳng
+ * ở đúng z = W. Mép trong lấy theo chỗ mép gốc ăn vào sâu nhất để phủ kín, nhưng không rộng quá 1,5 lần độ dày viền để
+ * khỏi che nan. Mặt dưới kéo xuống tới chỗ vành gốc đã đặc trọn vòng để dính liền.
+ */
+function topRim(wasm: ManifoldToplevel, slices: Slices, R: number, W: number, wall: number, seg: number): { ring: Manifold; inner: number } {
+  const n = slices.zs.length;
+  const band = W * 0.05;
+  let inner = R - 0.15;
+  for (let i = n - 1; i >= 0 && slices.zs[i] > W - band; i--) {
+    const polys = majorPolys(slices.at(i));
+    const hole = polys
+      .filter((p) => polygonArea(p) < 0)
+      .sort((a, b) => Math.abs(polygonArea(b)) - Math.abs(polygonArea(a)))[0];
+    if (hole) inner = Math.min(inner, minEdgeDistance(hole));
+  }
+  inner = Math.max(inner, R - 1.5 * wall);
+  const mid = (inner + R) / 2;
+  let bottom = W - band;
+  for (let i = n - 1; i >= 0; i--) {
+    if (ringFill(regionTester(majorPolys(slices.at(i))), mid) >= 0.98) {
+      bottom = Math.min(bottom, slices.zs[i] - 0.02);
+      break;
+    }
+  }
+  bottom = Math.max(bottom, W * 0.5);
+  const h = W - bottom;
+  const ring = wasm.Manifold.cylinder(h, R, R, seg).subtract(wasm.Manifold.cylinder(h + 2, inner, inner, seg).translate([0, 0, -1])).translate([0, 0, bottom]);
+  if (ring.status() !== 'NoError' || ring.isEmpty()) {
+    ring.delete();
+    throw new Error('Không dựng được vành mặt ngoài.');
+  }
+  return { ring, inner };
 }
 
 /**

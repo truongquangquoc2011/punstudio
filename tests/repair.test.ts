@@ -133,6 +133,16 @@ describe('xử lý mâm hỏng nặng', () => {
     }
   });
 
+  it('mặt ngoài có vành phẳng tròn đều, không nhô bậc', () => {
+    const { manifold, report } = processWheel(wasm, brokenWheel(), DEFAULT_SPEC, { repair: FAST });
+    expect(report.steps.some((s) => s.startsWith('Làm vành phẳng đều'))).toBe(true);
+    const polys = manifold.slice(4.98).toPolygons() as [number, number][][];
+    const rings = polys.map((p) => p.map(([x, y]) => Math.hypot(x, y))).sort((a, b) => Math.max(...b) - Math.max(...a));
+    expect(Math.max(...rings[0]) - Math.min(...rings[0])).toBeLessThan(0.01); // mép ngoài tròn đều
+    expect(Math.max(...rings[1]) - Math.min(...rings[1])).toBeLessThan(0.01); // mép trong tròn đều
+    expect(manifold.boundingBox().max[2]).toBeCloseTo(5, 3);
+  });
+
   it('dùng lại được kết quả đã sửa, không làm hỏng khi chạy nhiều lần', () => {
     const loaded = loadWheel(wasm, brokenWheel(), FAST);
     const a = processWheel(wasm, new Float32Array(0), DEFAULT_SPEC, { preloaded: loaded });
