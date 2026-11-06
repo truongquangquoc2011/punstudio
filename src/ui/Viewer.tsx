@@ -121,7 +121,7 @@ export function Viewer({ mesh, section, highlight, angle, angleNonce }: Props) {
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
-    geo.computeVertexNormals();
+    geo.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3));
     const base = cssColor('--model', '#a8a296');
     const accent = cssColor('--accent', '#d9541e');
     const colors = new Float32Array(mesh.positions.length);

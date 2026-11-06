@@ -113,6 +113,15 @@ describe('xử lý mâm hỏng nặng', () => {
     expect(hit).toBe(90);
   });
 
+  it('thân vành mâm đúc lại được làm tròn đều quanh vòng', () => {
+    const { manifold, report } = processWheel(wasm, brokenWheel(), DEFAULT_SPEC, { repair: FAST });
+    expect(report.steps.some((s) => s.startsWith('Làm tròn lại thân vành'))).toBe(true);
+    const polys = manifold.slice(report.wallTop * 0.5).toPolygons() as [number, number][][];
+    const outer = polys.map((p) => p.map(([x, y]) => Math.hypot(x, y))).sort((a, b) => Math.max(...b) - Math.max(...a))[0];
+    // Độ méo quanh vòng không quá 1,5 ô lưới (ở độ mịn "Nhanh" một ô ≈ 0,056 mm sau chuẩn hóa).
+    expect(Math.max(...outer) - Math.min(...outer)).toBeLessThan(0.056 * 1.5);
+  });
+
   it('dùng lại được kết quả đã sửa, không làm hỏng khi chạy nhiều lần', () => {
     const loaded = loadWheel(wasm, brokenWheel(), FAST);
     const a = processWheel(wasm, new Float32Array(0), DEFAULT_SPEC, { preloaded: loaded });

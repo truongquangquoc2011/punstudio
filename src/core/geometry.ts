@@ -221,3 +221,50 @@ export function regionTester(polys: Poly[], buckets = 128): (x: number, y: numbe
     return inside;
   };
 }
+
+/**
+ * Pháp tuyến cho lưới "soup" (9 số/tam giác): trung bình các mặt quanh đỉnh nếu lệch nhau dưới `creaseDeg`, nên mặt
+ * cong hiện mượt mà cạnh sắc vẫn giữ. Chỉ ảnh hưởng hình hiển thị.
+ */
+export function creasedNormals(pos: Float32Array, creaseDeg = 35): Float32Array {
+  const faces = pos.length / 9;
+  const fn = new Float32Array(faces * 3); // pháp tuyến có độ dài = 2 × diện tích (mặt lớn nặng hơn)
+  const unit = new Float32Array(faces * 3);
+  const at = new Map<string, number[]>();
+  for (let f = 0; f < faces; f++) {
+    const o = f * 9;
+    const ux = pos[o + 3] - pos[o], uy = pos[o + 4] - pos[o + 1], uz = pos[o + 5] - pos[o + 2];
+    const vx = pos[o + 6] - pos[o], vy = pos[o + 7] - pos[o + 1], vz = pos[o + 8] - pos[o + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    fn.set([nx, ny, nz], f * 3);
+    unit.set([nx / len, ny / len, nz / len], f * 3);
+    for (let k = 0; k < 3; k++) {
+      const key = `${pos[o + k * 3]},${pos[o + k * 3 + 1]},${pos[o + k * 3 + 2]}`;
+      const list = at.get(key);
+      if (list) list.push(f);
+      else at.set(key, [f]);
+    }
+  }
+  const cos = Math.cos((creaseDeg * Math.PI) / 180);
+  const out = new Float32Array(pos.length);
+  for (let f = 0; f < faces; f++) {
+    const o = f * 9;
+    const ax = unit[f * 3], ay = unit[f * 3 + 1], az = unit[f * 3 + 2];
+    for (let k = 0; k < 3; k++) {
+      const list = at.get(`${pos[o + k * 3]},${pos[o + k * 3 + 1]},${pos[o + k * 3 + 2]}`)!;
+      let x = 0, y = 0, z = 0;
+      for (const g of list) {
+        if (unit[g * 3] * ax + unit[g * 3 + 1] * ay + unit[g * 3 + 2] * az < cos) continue;
+        x += fn[g * 3];
+        y += fn[g * 3 + 1];
+        z += fn[g * 3 + 2];
+      }
+      const len = Math.hypot(x, y, z) || 1;
+      out[o + k * 3] = x / len;
+      out[o + k * 3 + 1] = y / len;
+      out[o + k * 3 + 2] = z / len;
+    }
+  }
+  return out;
+}

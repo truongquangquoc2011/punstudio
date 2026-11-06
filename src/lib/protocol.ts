@@ -3,6 +3,7 @@ import type { WheelReport, WheelSpec } from '../core/wheel';
 
 export interface ViewMesh {
   positions: Float32Array; // 9 số / tam giác
+  normals: Float32Array; // cùng cỡ với positions
   added: Uint8Array; // 1 = phần app thêm vào
 }
 

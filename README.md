@@ -26,7 +26,7 @@ App tự chẩn đoán lưới rồi chọn cách sửa trước khi chuẩn hó
 | Lỗi rất ít (≤ 0,2% số cạnh) | Vá lỗ, lật mặt ngược | Phần còn lại không đổi |
 | Lỗi nặng (hở nhiều, mảnh chồng, mặt lật) | Đúc lại thành khối đặc (`src/core/remesh.ts`) | Dựng mới, sai lệch được đo và báo |
 
-Đúc lại: đánh dấu ô lưới có bề mặt đi qua, bịt khe nhỏ, loang từ ngoài vào để tìm phần ruột, giữ các lớp mặt không có độ dày (thân vành, nắp tâm dựng bằng một mặt đơn) với độ dày tối thiểu khoảng 4 ô, rồi dựng lại mặt kín. Chi tiết nhỏ hơn khoảng 3 ô (lỗ ốc nhỏ) có thể bị bít – chọn độ mịn cao hơn để giữ được nhiều hơn. Có thể ép đúc lại bằng "Luôn đúc lại".
+Đúc lại: đánh dấu ô lưới có bề mặt đi qua, bịt khe nhỏ, loang từ ngoài vào để tìm phần ruột, giữ các lớp mặt không có độ dày (thân vành, nắp tâm dựng bằng một mặt đơn) với độ dày tối thiểu khoảng 4 ô, rồi dựng lại mặt kín, làm láng bề mặt và làm tròn lại thân vành theo biên dạng trung bình ở từng độ cao. Chi tiết nhỏ hơn khoảng 3 ô (lỗ ốc nhỏ) có thể bị bít – chọn độ mịn cao hơn để giữ được nhiều hơn. Có thể ép đúc lại bằng "Luôn đúc lại".
 
 ## Cấu hình đã lưu
 

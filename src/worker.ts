@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import Module, { type Manifold, type ManifoldToplevel } from 'manifold-3d';
 import wasmUrl from 'manifold-3d/manifold.wasm?url';
-import { rasterize, type Poly } from './core/geometry';
+import { creasedNormals, rasterize, type Poly } from './core/geometry';
 import { parseStl, writeStl } from './core/stl';
 import { loadWheel, type LoadedWheel, type RepairOptions } from './core/load';
 import { processWheel, type WheelSpec } from './core/wheel';
@@ -63,7 +63,8 @@ function toView(m: Manifold, sourceId: number | null, baseRegion: Poly[] = []): 
       flags.push(addedRun[f]);
     }
   }
-  return { positions: new Float32Array(pos), added: new Uint8Array(flags) };
+  const positions = new Float32Array(pos);
+  return { positions, normals: creasedNormals(positions), added: new Uint8Array(flags) };
 }
 
 /** Mâm đã đọc/sửa của file đang mở – đúc lại mất vài chục giây, đổi thông số thì không cần làm lại. */
@@ -94,7 +95,7 @@ async function run(id: number, buffer: ArrayBuffer, spec: WheelSpec, flip: boole
     const out = manifold.getMesh();
     const stl = writeStl(out.vertProperties, out.triVerts, out.numProp, 'wheel-tool');
     const msg: WorkerResponse = { type: 'result', id, report, result, source, stl, ms: performance.now() - t0 };
-    postMessage(msg, [result.positions.buffer, result.added.buffer, source.positions.buffer, source.added.buffer, stl]);
+    postMessage(msg, [result.positions.buffer, result.normals.buffer, result.added.buffer, source.positions.buffer, source.normals.buffer, source.added.buffer, stl]);
   } finally {
     manifold.delete();
     prepared.delete();

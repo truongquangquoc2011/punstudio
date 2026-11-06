@@ -398,7 +398,7 @@ export function processWheel(
     const solidParts = parts.filter((p) => Math.abs(p.volume()) > total * 1e-6);
     const junk = parts.length - solidParts.length;
     const input = keep(keep(Manifold.union(solidParts)).asOriginal());
-    const sourceId = input.originalID();
+    let sourceId = input.originalID();
     for (const p of parts) p.delete();
     if (junk) repairs.push(`Bỏ ${junk} mảnh rác không có thể tích`);
     const inputPieces = countPieces(input);
@@ -441,6 +441,13 @@ export function processWheel(
     if (!faceAtMax) {
       m = keep(m.transform(mat4([[1, 0, 0], [0, -1, 0], [0, 0, -1]], [0, 0, W])));
       slices = new Slices(m, W);
+    }
+    if (repair.rebuild) {
+      // Lưới đúc lại từ file hỏng thường méo quanh vòng: làm tròn thân vành. File lành không qua bước này.
+      m = keep(roundBarrel(wasm, m, R, W, faceRange(slices, 0.5 * R, W).end));
+      sourceId = m.originalID();
+      slices = new Slices(m, W);
+      steps.push('Làm tròn lại thân vành theo biên dạng trung bình ở từng độ cao');
     }
     const prepared = m.translate([0, 0, 0]); // bản sao không nằm trong danh sách dọn
     steps.push(
@@ -591,6 +598,92 @@ function countPieces(m: Manifold): number {
   const n = parts.filter((p) => Math.abs(p.volume()) > total * 1e-6).length;
   for (const p of parts) p.delete();
   return n;
+}
+
+/**
+ * Làm tròn thân vành của lưới đúc lại. Mâm là vật tròn xoay nên mặt ngoài vành ở mỗi độ cao phải cách trục đều nhau;
+ * phần lượn sóng quanh vòng là do file gốc hỏng. Đỉnh thuộc mặt ngoài vành (pháp tuyến hướng ra, gần mép ngoài) được đưa
+ * về bán kính trung vị của độ cao đó, giữ nguyên gân và mép vành. Mặt trong chỉ xử lý đoạn phía trên mặt nan, gần mép
+ * ngoài – ở đó không có nan. Nan, moay-ơ và mặt thiết kế không bị đụng tới.
+ */
+function roundBarrel(wasm: ManifoldToplevel, m: Manifold, R: number, W: number, faceEnd: number): Manifold {
+  const mesh = m.getMesh();
+  const { vertProperties, triVerts, numProp } = mesh;
+  const vert = Float32Array.from(vertProperties);
+  const n = vert.length / numProp;
+  const normal = new Float32Array(n * 3);
+  for (let f = 0; f < triVerts.length; f += 3) {
+    const [a, b, c] = [triVerts[f] * numProp, triVerts[f + 1] * numProp, triVerts[f + 2] * numProp];
+    const ux = vert[b] - vert[a], uy = vert[b + 1] - vert[a + 1], uz = vert[b + 2] - vert[a + 2];
+    const vx = vert[c] - vert[a], vy = vert[c + 1] - vert[a + 1], vz = vert[c + 2] - vert[a + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    for (let k = 0; k < 3; k++) {
+      const i = triVerts[f + k] * 3;
+      normal[i] += nx;
+      normal[i + 1] += ny;
+      normal[i + 2] += nz;
+    }
+  }
+  const BINS = 120;
+  // Theo tỉ lệ bán kính: độ tản tối đa trong một độ cao, bước bán kính giữa hai độ cao kề, và khoảng dời tối đa của đỉnh.
+  const MAX_SPREAD = 0.02, MAX_STEP = 0.006, MAX_MOVE = 0.015;
+  const binOf = (z: number) => Math.min(BINS - 1, Math.max(0, Math.floor((z / W) * BINS)));
+  // Bán kính lớn nhất của từng độ cao: chỉ đỉnh gần mép ngoài mới thuộc mặt ngoài vành.
+  const reach = new Float32Array(BINS);
+  const radius = new Float32Array(n);
+  const radial = new Float32Array(n); // cos góc giữa pháp tuyến và hướng tỏa từ trục
+  for (let i = 0; i < n; i++) {
+    const o = i * numProp;
+    const r = Math.hypot(vert[o], vert[o + 1]);
+    radius[i] = r;
+    const len = Math.hypot(normal[i * 3], normal[i * 3 + 1], normal[i * 3 + 2]) || 1;
+    radial[i] = r > 0 ? (normal[i * 3] * vert[o] + normal[i * 3 + 1] * vert[o + 1]) / (r * len) : 0;
+    const b = binOf(vert[o + 2]);
+    reach[b] = Math.max(reach[b], r);
+  }
+  const collect = (select: (i: number, b: number) => boolean): { ids: number[]; profile: Float32Array } => {
+    const bins: number[][] = Array.from({ length: BINS }, () => []);
+    const ids: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const b = binOf(vert[i * numProp + 2]);
+      if (select(i, b)) {
+        bins[b].push(radius[i]);
+        ids.push(i);
+      }
+    }
+    // Trung vị từng độ cao; độ cao có đỉnh tản rộng là chỗ hai mặt khác nhau gặp nhau (mép, bậc gấp) – không đụng tới.
+    const raw = bins.map((list) => {
+      if (list.length < 8) return NaN;
+      list.sort((x, y) => x - y);
+      const spread = list[Math.floor(list.length * 0.9)] - list[Math.floor(list.length * 0.1)];
+      return spread > MAX_SPREAD * R ? NaN : list[Math.floor(list.length / 2)];
+    });
+    // Chỉ giữ đoạn thẳng: độ cao liền kề hai bên đều hợp lệ và không đổi bán kính đột ngột. Mép vành bị loại ở đây.
+    const profile = new Float32Array(BINS).fill(NaN);
+    for (let b = 1; b < BINS - 1; b++) {
+      const a = raw[b - 1], c = raw[b + 1];
+      if (Number.isNaN(a) || Number.isNaN(raw[b]) || Number.isNaN(c)) continue;
+      if (Math.abs(a - raw[b]) > MAX_STEP * R || Math.abs(c - raw[b]) > MAX_STEP * R) continue;
+      profile[b] = (a + raw[b] + c) / 3;
+    }
+    return { ids, profile };
+  };
+  const apply = ({ ids, profile }: { ids: number[]; profile: Float32Array }) => {
+    for (const i of ids) {
+      const o = i * numProp;
+      const target = profile[binOf(vert[o + 2])];
+      if (Number.isNaN(target) || radius[i] === 0 || Math.abs(target - radius[i]) > MAX_MOVE * R) continue;
+      const k = target / radius[i];
+      vert[o] *= k;
+      vert[o + 1] *= k;
+    }
+  };
+  const margin = 0.06 * R;
+  apply(collect((i, b) => radial[i] > 0.6 && radius[i] >= reach[b] - margin));
+  apply(collect((i) => radial[i] < -0.6 && radius[i] >= R - 0.2 * R && vert[i * numProp + 2] > faceEnd));
+  const out = new wasm.Mesh({ numProp, vertProperties: vert, triVerts });
+  const rounded = wasm.Manifold.ofMesh(out);
+  return rounded.asOriginal();
 }
 
 /** Bỏ mảnh thể tích ~0 để file xuất ra chỉ gồm khối thật. */

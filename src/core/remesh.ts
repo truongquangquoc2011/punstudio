@@ -19,9 +19,11 @@ export interface RemeshOptions {
   seal: number;
   /** Làm mịn (độ lệch chuẩn Gauss, đơn vị ô). 0 = giữ bậc thang của ô. */
   smooth: number;
+  /** Số lượt làm láng bề mặt sau khi dựng (Taubin). 0 = không làm. */
+  fair?: number;
 }
 
-export const DEFAULT_REMESH: RemeshOptions = { resolution: 220, seal: 1, smooth: 1.2 };
+export const DEFAULT_REMESH: RemeshOptions = { resolution: 220, seal: 1, smooth: 1.2, fair: 30 };
 
 export interface RemeshResult {
   manifold: Manifold;
@@ -131,6 +133,8 @@ export function remesh(
   // với Gauss độ lệch σ ô, dời vào d ô tương ứng ngưỡng Φ(d/σ).
   onStage?.('surface');
   const surface = marchingTets(field, n, origin, h, opts.smooth > 0 ? normalCdf(0.5 / opts.smooth) : 0.5);
+  // Trường đặc/rỗng để lại gợn bậc thang theo ô lưới: làm láng để mặt đều, chỉ dời đỉnh nên lưới vẫn kín.
+  taubin(surface.vert, surface.tri, opts.fair ?? 0);
   const raw = wasm.Manifold.ofMesh(new wasm.Mesh({ numProp: 3, vertProperties: surface.vert, triVerts: surface.tri }));
   if (raw.status() !== 'NoError' || raw.isEmpty()) {
     raw.delete();
@@ -150,6 +154,50 @@ export function remesh(
   const manifold = wasm.Manifold.union(kept);
   for (const p of parts) p.delete();
   return { manifold, cell: h, grid: n, dropped };
+}
+
+/**
+ * Làm láng lưới kiểu Taubin: mỗi lượt kéo đỉnh về trung bình các đỉnh kề (λ > 0) rồi đẩy ngược lại (μ < 0).
+ * Khử gợn tần số cao mà không làm vật co lại như làm mịn Laplace thường.
+ */
+function taubin(vert: Float32Array, tri: Uint32Array, passes: number) {
+  if (passes <= 0) return;
+  const n = vert.length / 3;
+  // Danh sách đỉnh kề dạng nén: mỗi cạnh của tam giác đóng góp hai chiều (cạnh trong lưới kín được đếm đều nhau).
+  const start = new Uint32Array(n + 1);
+  for (let i = 0; i < tri.length; i++) start[tri[i] + 1] += 2;
+  for (let i = 0; i < n; i++) start[i + 1] += start[i];
+  const fill = start.slice(0, n);
+  const adj = new Uint32Array(tri.length * 2);
+  for (let f = 0; f < tri.length; f += 3) {
+    for (let k = 0; k < 3; k++) {
+      const a = tri[f + k], b = tri[f + ((k + 1) % 3)], c = tri[f + ((k + 2) % 3)];
+      adj[fill[a]++] = b;
+      adj[fill[a]++] = c;
+    }
+  }
+  const delta = new Float32Array(vert.length);
+  const step = (w: number) => {
+    for (let i = 0; i < n; i++) {
+      let x = 0, y = 0, z = 0;
+      const from = start[i], to = start[i + 1];
+      for (let j = from; j < to; j++) {
+        const o = adj[j] * 3;
+        x += vert[o];
+        y += vert[o + 1];
+        z += vert[o + 2];
+      }
+      const c = to - from || 1;
+      delta[i * 3] = x / c - vert[i * 3];
+      delta[i * 3 + 1] = y / c - vert[i * 3 + 1];
+      delta[i * 3 + 2] = z / c - vert[i * 3 + 2];
+    }
+    for (let i = 0; i < vert.length; i++) vert[i] += w * delta[i];
+  };
+  for (let p = 0; p < passes; p++) {
+    step(0.55);
+    step(-0.58);
+  }
 }
 
 /** Hàm phân phối chuẩn tích lũy (xấp xỉ Abramowitz–Stegun, đủ cho x > 0). */
