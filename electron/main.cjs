@@ -1,8 +1,9 @@
 // Vỏ desktop cho Punstudio: một cửa sổ nạp bản build tĩnh trong dist/ qua giao thức app:// (để WebAssembly và
-// Web Worker chạy y như trên trình duyệt – file:// chặn module worker). Không mở mạng, không có Node trong trang.
+// Web Worker chạy y như trên trình duyệt – file:// chặn module worker). Trang không có Node; mạng chỉ dùng để kiểm tra bản cập nhật.
 const { app, BrowserWindow, Menu, protocol, net, shell } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { setupUpdater } = require('./updater.cjs');
 
 const DIST = path.join(__dirname, '..', 'dist');
 
@@ -24,7 +25,7 @@ function createWindow() {
     backgroundColor: '#f2efe9',
     title: 'Punstudio',
     autoHideMenuBar: true,
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.cjs') },
   });
   // Liên kết ngoài (nếu có) mở bằng trình duyệt của máy, không mở trong app.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -44,6 +45,7 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(file).toString());
   });
   const win = createWindow();
+  setupUpdater(win);
   if (process.env.WHEEL_SMOKE) smokeTest(win, process.env.WHEEL_SMOKE);
 });
 

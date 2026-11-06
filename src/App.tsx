@@ -5,6 +5,7 @@ import { createProcessor } from './lib/processor';
 import type { WorkerResponse } from './lib/protocol';
 import { SpecPanel, loadSpec, saveSpec } from './ui/SpecPanel';
 import { Report } from './ui/Report';
+import { UpdateBar } from './ui/UpdateBar';
 import { Viewer, type Angle } from './ui/Viewer';
 
 type Result = Extract<WorkerResponse, { type: 'result' }>;
@@ -152,9 +153,12 @@ export default function App() {
           <span className="brand-name">Punstudio</span>
           <span className="brand-tag mono">STL · 1:64</span>
         </div>
-        <div className="topbar-status mono">
-          {status.kind === 'busy' && <span className="pulse">{STAGES[stage] ?? 'Đang xử lý'}</span>}
-          {status.kind === 'done' && <span>Xong trong {(status.result.ms / 1000).toFixed(1).replace('.', ',')} s</span>}
+        <div className="topbar-right">
+          <div className="topbar-status mono">
+            {status.kind === 'busy' && <span className="pulse">{STAGES[stage] ?? 'Đang xử lý'}</span>}
+            {status.kind === 'done' && <span>Xong trong {(status.result.ms / 1000).toFixed(1).replace('.', ',')} s</span>}
+          </div>
+          <UpdateBar />
         </div>
         {status.kind === 'busy' && <div className="progress" aria-hidden />}
       </header>

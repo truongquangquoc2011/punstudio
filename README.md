@@ -62,6 +62,18 @@ Bộ cài chưa ký số nên Windows có thể hiện “Windows protected your
 
 Icon và ảnh bộ cài: `npm run icon` tạo lại từ thiết kế trong `scripts/make-icon.cjs`.
 
+## Cập nhật app
+
+Mỗi lần mở (và 6 tiếng một lần), app hỏi GitHub Releases của repo này. Có bản mới thì thanh đầu hiện nút **Cập nhật**: bấm để tải, tải xong bấm **Khởi động lại để cập nhật**. Bấm số phiên bản ở góc phải để kiểm tra bằng tay. Mất mạng thì app im lặng, vẫn dùng bình thường.
+
+Phát hành bản mới:
+
+1. Tăng `version` trong `package.json`.
+2. Đặt biến `GH_TOKEN` (token GitHub có quyền ghi repo) rồi chạy `npm run release`: tự build và tải lên Releases dưới dạng bản nháp.
+3. Vào trang Releases trên GitHub, bấm **Publish release**. Từ lúc đó app của mọi người mới thấy bản mới.
+
+Cần 3 file trong Release: `Punstudio-Setup-x.y.z.exe`, `.blockmap` và `latest.yml`. Repo phải **công khai** thì app mới đọc được Releases mà không cần đăng nhập.
+
 ## Cách hoạt động
 
 1. **Đọc + sửa lưới**: xem mục "Sửa mâm lỗi". Mảnh rác thể tích 0 bị bỏ, khối chồng nhau được gộp.

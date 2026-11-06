@@ -862,3 +862,64 @@ input {
     height: calc(100vh - 48px);
   }
 }
+
+/* ------------------------------------------------------------ cập nhật app */
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.update {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 16px;
+  border-left: 1px solid var(--rule);
+}
+
+.update-text {
+  font-size: 12.5px;
+}
+
+.update-text.is-bad {
+  color: var(--accent);
+}
+
+.update-link {
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.update-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.update-meter {
+  width: 90px;
+  height: 4px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.update-meter i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-accent:hover {
+  filter: brightness(0.92);
+}

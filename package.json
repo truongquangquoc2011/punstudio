@@ -1,7 +1,7 @@
 {
   "name": "punstudio",
   "private": true,
-  "version": "1.1.2",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1430",
@@ -12,7 +12,8 @@
     "process": "tsx scripts/process.ts",
     "app": "vite build && electron .",
     "dist:win": "vite build && electron-builder --win nsis --x64",
-    "icon": "node scripts/make-icon.cjs"
+    "icon": "node scripts/make-icon.cjs",
+    "release": "vite build && electron-builder --win nsis --x64 --publish always"
   },
   "devDependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",
@@ -72,6 +73,14 @@
       "multiLanguageInstaller": true,
       "artifactName": "Punstudio-Setup-${version}.exe",
       "displayLanguageSelector": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "truongquangquoc2011",
+      "repo": "punstudio"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   }
 }
