@@ -6,7 +6,7 @@
 
 | Thông số | Mặc định | App làm gì |
 |---|---|---|
-| Đường kính ngoài | 8,5 mm | Co giãn theo bán kính cho đúng số |
+| Đường kính ngoài | 8,5 mm | Co giãn cho đúng số, rồi đắp đầy đoạn lõm để mặt ngoài là trụ thẳng đúng đường kính suốt bề rộng |
 | Bề rộng mâm | 5 mm | Co giãn theo trục cho đúng số (độc lập với đường kính) |
 | Viền vành tối thiểu | 1 mm | Chỗ mỏng hơn thì đắp vào phía trong, chỗ dày hơn giữ nguyên |
 | Khối trụ sỏ trục | Ø3 mm | Thêm ở tâm mặt trong, từ mép trong tới mặt nan; khối trụ cũ to hơn thì gọt về Ø3 |

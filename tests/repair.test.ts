@@ -122,6 +122,17 @@ describe('xử lý mâm hỏng nặng', () => {
     expect(Math.max(...outer) - Math.min(...outer)).toBeLessThan(0.056 * 1.5);
   });
 
+  it('mặt ngoài là trụ thẳng đúng đường kính dù mâm gốc có đoạn lõm', () => {
+    const { manifold, report } = processWheel(wasm, brokenWheel(), DEFAULT_SPEC, { repair: FAST });
+    expect(report.steps.some((s) => s.startsWith('Đắp đầy mặt ngoài'))).toBe(true);
+    for (const z of [0.3, 1.5, 2.5, 3.5, 4.7]) {
+      const polys = manifold.slice(z).toPolygons() as [number, number][][];
+      const radii = polys.map((p) => p.map(([x, y]) => Math.hypot(x, y))).sort((a, b) => Math.max(...b) - Math.max(...a))[0];
+      expect(Math.max(...radii)).toBeCloseTo(4.25, 2);
+      expect(Math.min(...radii)).toBeGreaterThan(4.24);
+    }
+  });
+
   it('dùng lại được kết quả đã sửa, không làm hỏng khi chạy nhiều lần', () => {
     const loaded = loadWheel(wasm, brokenWheel(), FAST);
     const a = processWheel(wasm, new Float32Array(0), DEFAULT_SPEC, { preloaded: loaded });

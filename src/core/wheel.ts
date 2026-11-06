@@ -450,6 +450,18 @@ export function processWheel(
       steps.push('Làm tròn lại thân vành theo biên dạng trung bình ở từng độ cao');
     }
     const prepared = m.translate([0, 0, 0]); // bản sao không nằm trong danh sách dọn
+    // Mặt ngoài phải là trụ thẳng đúng đường kính từ đầu tới cuối, để in ra không gồ ghề; mâm đã thẳng thì không đổi.
+    const fill = fillOuter(wasm, slices, R, W, seg);
+    if (fill) {
+      m = keep(m.add(keep(keep(fill).asOriginal())));
+      // Đắp ngoài có thể bịt rãnh cuốn ở mép vành thành khoang kín bên trong (mảnh thể tích âm): lấp luôn.
+      const shells = m.decompose();
+      const solid = shells.filter((p) => p.volume() > 0);
+      if (solid.length < shells.length) m = keep(Manifold.compose(solid));
+      for (const p of shells) p.delete();
+      slices = new Slices(m, W);
+      steps.push(`Đắp đầy mặt ngoài thành trụ thẳng Ø${fmt(spec.diameter)} mm`);
+    }
     steps.push(
       `Đổi kích thước: Ø${fmt(sourceDiameter)} → Ø${fmt(spec.diameter)} mm (×${fmt(sr, 3)}), ` +
         `rộng ${fmt(sourceWidth)} → ${fmt(spec.width)} mm (×${fmt(sz, 3)})`,
@@ -684,6 +696,35 @@ function roundBarrel(wasm: ManifoldToplevel, m: Manifold, R: number, W: number, 
   const out = new wasm.Mesh({ numProp, vertProperties: vert, triVerts });
   const rounded = wasm.Manifold.ofMesh(out);
   return rounded.asOriginal();
+}
+
+/**
+ * Lớp đắp hình tròn xoay lấp từ mặt ngoài hiện tại ra đúng bán kính R trên suốt bề rộng. Lấn vào thành 0,03 mm để dính
+ * liền; không lấn quá 0,7R nên một khe hở trên thành không kéo lớp đắp che mất nan. Trả null nếu mặt ngoài đã thẳng.
+ */
+function fillOuter(wasm: ManifoldToplevel, slices: Slices, R: number, W: number, seg: number): Manifold | null {
+  const zs: number[] = [];
+  const inner: number[] = [];
+  let lowest = Infinity;
+  for (let i = 0; i < slices.zs.length; i++) {
+    const ro = ringOuter(regionTester(majorPolys(slices.at(i))), R + 0.02);
+    if (ro === null) continue;
+    lowest = Math.min(lowest, ro);
+    zs.push(slices.zs[i]);
+    inner.push(Math.max(0.7 * R, ro - 0.03));
+  }
+  if (zs.length < 2 || lowest >= R - 0.01) return null;
+  zs[0] = 0;
+  zs[zs.length - 1] = W;
+  const profile: [number, number][] = zs.map((z, i) => [inner[i], z]);
+  profile.push([R, W], [R, 0]);
+  if (polygonArea(profile) < 0) profile.reverse();
+  const shell = wasm.Manifold.revolve([profile], seg);
+  if (shell.status() !== 'NoError' || shell.isEmpty()) {
+    shell.delete();
+    throw new Error('Không dựng được lớp đắp mặt ngoài.');
+  }
+  return shell;
 }
 
 /** Bỏ mảnh thể tích ~0 để file xuất ra chỉ gồm khối thật. */
